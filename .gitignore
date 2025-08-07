@@ -1,0 +1,19 @@
+# Python bytecode and cache
+__pycache__/
+*.pyc
+
+# Environment variables
+# Contains secrets and should NEVER be committed!
+.env
+
+# Database files
+# The database file can change frequently and contain sensitive data.
+*.db
+
+# Log files
+# Log files are generated during runtime and don't need to be tracked.
+*.log
+
+# IDE/Editor specific settings
+.vscode/
+.idea/
