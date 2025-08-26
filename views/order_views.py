@@ -53,16 +53,21 @@ class AccountSelectView(View):
         self.search_params = search_params
 
         # Create the dropdown options from the fetched credentials
-        options = [discord.SelectOption(label=email, description="Use this email account") for email, password in user_credentials]
+        email_options = [discord.SelectOption(label=email, description="Use this email account") for email, password in user_credentials]
+        all_option = discord.SelectOption(
+            label="All Accounts", 
+            description="Search across all email accounts",
+            value="--all--",  # A special value to identify this option
+        )
+
+        options = [all_option] + email_options
+
         self.add_item(self.AccountSelect(options=options, placeholder="Choose an email account..."))
 
     class AccountSelect(Select):
         async def callback(self, interaction: discord.Interaction):
             # 'self.view' gives us access to the parent AccountSelectView's attributes
-            selected_email = self.values[0]
-
-            # Find the credentials that match the selected email
-            username, password = next((email, pwd) for email, pwd in self.view.user_credentials if email == selected_email)
+            selected_value = self.values[0]
             self.view.clear_items()
 
             # Now, trigger the date modal, reusing the future pattern
@@ -75,36 +80,72 @@ class AccountSelectView(View):
                 start_date = result["start_date"]
 
                 await modal_interaction.response.defer(ephemeral=True, thinking=True)
-
-
+            
                 # Use the credentials and parameters passed to this view
-                placed_result = search_emails(
-                    username=username,
-                    password=password,
-                    subject=self.view.search_params["subject"],
-                    sender=self.view.search_params["sender"],
-                    start_date_dt=start_date,
-                    end_date_dt=start_date
-                )
-                canceled_result = search_emails(
-                    username=username, password=password,
-                    subject=self.view.search_params["subject_canceled"],
-                    sender=self.view.search_params["sender"],
-                    start_date_dt=start_date, end_date_dt=start_date
+                if selected_value == "--all--":
+                    embed = discord.Embed(
+                        title=f"{self.view.search_params['retailer']} Orders",
+                        description=f"Scraped: `All Emails`",
+                        color=discord.Color.green()
                     )
 
-                embed = discord.Embed(
-                    title=f"{self.view.search_params['retailer']} Orders",
-                    description=f"Scraped: `{username}`",
-                    color=discord.Color.blue()
-                )
-                embed.add_field(name="✅ Placed Orders", value=str(placed_result), inline=True)
-                embed.add_field(name="❌ Canceled Orders", value=str(canceled_result), inline=True)
-                embed.add_field(name="🗓️ Date Scraped", value=f"{start_date}", inline=False)
-                embed.set_footer(text="Order Tracker")
-                embed.timestamp = discord.utils.utcnow()
+                    placed = 0
+                    canceled = 0
+                    # Loop through all credentials and process them one by one
+                    for username, password in self.view.user_credentials:
+                        placed_result = search_emails(
+                            username=username, password=password,
+                            subject=self.view.search_params["subject"],
+                            sender=self.view.search_params["sender"],
+                            start_date_dt=start_date, end_date_dt=start_date
+                        )
+                        canceled_result = search_emails(
+                            username=username, password=password,
+                            subject=self.view.search_params["subject_canceled"],
+                            sender=self.view.search_params["sender"],
+                            start_date_dt=start_date, end_date_dt=start_date
+                        )
+                        placed += placed_result
+                        canceled += canceled_result
 
-                await modal_interaction.followup.send(embed=embed)
+                    embed.add_field(name="✅ Placed Orders", value=str(placed), inline=True)
+                    embed.add_field(name="❌ Canceled Orders", value=str(canceled), inline=True)
+                    embed.add_field(name="🗓️ Date Scraped", value=f"{start_date}", inline=False)
+                    embed.set_footer(text="Order Tracker")
+                    embed.timestamp = discord.utils.utcnow()
+
+                    await modal_interaction.followup.send(embed=embed)
+
+                else:
+                    # --- This is the original logic for a single account ---
+                    username, password = next((email, pwd) for email, pwd in self.view.user_credentials if email == selected_value)
+                    
+                    placed_result = search_emails(
+                        username=username, password=password,
+                        subject=self.view.search_params["subject"],
+                        sender=self.view.search_params["sender"],
+                        start_date_dt=start_date, end_date_dt=start_date
+                    )
+                    canceled_result = search_emails(
+                        username=username, password=password,
+                        subject=self.view.search_params["subject_canceled"],
+                        sender=self.view.search_params["sender"],
+                        start_date_dt=start_date, end_date_dt=start_date
+                    )
+
+                    embed = discord.Embed(
+                        title=f"{self.view.search_params['retailer']} Orders",
+                        description=f"Scraped: `{username}`",
+                        color=discord.Color.blue()
+                    )
+                    embed.add_field(name="✅ Placed Orders", value=str(placed_result), inline=True)
+                    embed.add_field(name="❌ Canceled Orders", value=str(canceled_result), inline=True)
+                    embed.add_field(name="🗓️ Date Scraped", value=f"{start_date}", inline=False)
+                    embed.set_footer(text="Order Tracker")
+                    embed.timestamp = discord.utils.utcnow()
+
+                    await modal_interaction.followup.send(embed=embed)
+
 
 
             except asyncio.TimeoutError:
