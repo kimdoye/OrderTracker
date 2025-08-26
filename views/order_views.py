@@ -13,7 +13,7 @@ from utils.database_handler import get_all_user_credentials
 
 # Your DateInputModal class remains unchanged.
 class DateInputModal(Modal, title="Enter a Date Range"):
-    startInputValue = TextInput(label="Scrap Date", placeholder="YYYYMMDD", required=True)
+    startInputValue = TextInput(label="Scrap Date", placeholder="YYYYMMDD or Y or T", required=True)
 
     def __init__(self, future: asyncio.Future):
         super().__init__(timeout=300)
@@ -22,9 +22,12 @@ class DateInputModal(Modal, title="Enter a Date Range"):
     async def on_submit(self, interaction: discord.Interaction):
         startInput = self.startInputValue.value
         try:
-            if startInput.lower() == 'today':
+            if startInput.lower() == 't':
                 # If so, use datetime to get the current date.
                 start_date_dt = datetime.date.today()
+            elif startInput.lower() == 'y':
+                # Yesterday 
+                 start_date_dt = datetime.date.today() - datetime.timedelta(days=1)
             else:
                 # 2. Otherwise, fall back to parsing the input as a normal date.
                 start_date_dt = parse(startInput).date()
